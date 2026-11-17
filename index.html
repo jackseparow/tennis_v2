@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PadeLion Tennis Tournament Pro</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- SortableJS untuk Drag and Drop -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <!-- Supabase JS Client Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 sm:p-6">
+
+    <div class="max-w-5xl mx-auto">
+        <!-- Header / Banner Putih (Logo PadeLion & Teks Diperbesar) -->
+        <header class="flex flex-col sm:flex-row items-center justify-center sm:justify-start space-y-4 sm:space-y-0 sm:space-x-6 mb-8 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-2xl text-center sm:text-left">
+            <img src="logo padelion.png" alt="Logo PadeLion" class="h-28 sm:h-36 w-auto object-contain drop-shadow-md" onerror="this.style.display='none'">
+            <div>
+                <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">PadeLion Tennis Tournament Pro</h1>
+                <p class="text-slate-600 text-sm sm:text-base font-medium mt-2">Advanced Round Robin, Group Pools, Knockout & Realtime Supabase</p>
+            </div>
+        </header>
+
+        <!-- TAHAP 1: SETUP TURNAMEN -->
+        <div id="setup-section" class="bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700 mb-6">
+            <h2 class="text-xl font-semibold mb-4 text-emerald-300">1. Konfigurasi Turnamen & Grup</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">Daftar Pemain/Tim (Pisahkan dengan Enter)</label>
+                    <textarea id="input-players" rows="5" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm focus:outline-none focus:border-emerald-500 mb-3" placeholder="Tim Alpha&#10;Tim Bravo&#10;Tim Charlie&#10;Tim Delta&#10;Tim Echo&#10;Tim Foxtrot">Tim Alpha
+Tim Bravo
+Tim Charlie
+Tim Delta
+Tim Echo
+Tim Foxtrot</textarea>
+                    <button onclick="generateTeamChips()" class="w-full bg-slate-700 hover:bg-slate-600 text-emerald-300 text-xs font-semibold py-2 rounded-xl transition border border-slate-600">
+                        Muat Tim ke Kotak Drag & Drop 🔄
+                    </button>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Metode Pembagian Pool</label>
+                        <select id="input-assignment-method" onchange="toggleAssignmentUI()" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm focus:outline-none focus:border-emerald-500">
+                            <option value="auto">Acak Otomatis oleh Aplikasi (Shuffle)</option>
+                            <option value="manual" selected>Seret Manual ke Pool (Drag & Drop)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Jumlah Pool / Grup</label>
+                        <select id="input-pools" onchange="renderManualPoolBoxes()" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm focus:outline-none focus:border-emerald-500">
+                            <option value="1">1 Grup (Single Pool)</option>
+                            <option value="2" selected>2 Grup (Pool A & Pool B)</option>
+                            <option value="3">3 Grup (Pool A, B, C)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Sistem Penilaian Klasemen</label>
+                        <select id="input-scoring-system" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm focus:outline-none focus:border-emerald-500">
+                            <option value="match-wins">Poin dari Kemenangan Match/Set (Standar)</option>
+                            <option value="game-diff" selected>Berbasis Selisih Game (Game Won - Lost)</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1">Max Set</label>
+                            <select id="input-sets" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm focus:outline-none focus:border-emerald-500">
+                                <option value="1">1 Set</option>
+                                <option value="3" selected>Best of 3</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1">Game per Set</label>
+                            <input type="number" id="input-games" value="6" min="1" max="10" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-sm focus:outline-none focus:border-emerald-500">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KOTAK DRAG & DROP MANUAL POOL -->
+            <div id="manual-pool-section" class="mb-6 p-4 bg-slate-900/80 rounded-2xl border border-slate-700">
+                <h3 class="text-sm font-bold text-emerald-400 mb-2">Area Seret Tim (Drag & Drop ke Pool)</h3>
+                <p class="text-xs text-slate-400 mb-4">Seret nama tim dari daftar sumber ke kotak Pool masing-masing.</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-slate-800 p-3 rounded-xl border border-slate-700">
+                        <span class="text-xs font-bold text-slate-300 block mb-2 uppercase tracking-wider">Daftar Tim Tersedia</span>
+                        <div id="unsorted-chips" class="flex flex-wrap gap-2 min-h-[100px] p-2 bg-slate-900 rounded-lg border border-dashed border-slate-700"></div>
+                    </div>
+                    <div id="manual-pools-container" class="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+                </div>
+            </div>
+
+            <button onclick="initTournament()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-semibold py-3 rounded-xl transition duration-200 shadow-lg shadow-emerald-900/30">
+                Simpan & Mulai Turnamen ke Cloud 🚀
+            </button>
+        </div>
+
+        <!-- TAHAP 2: DASHBOARD UTAMA -->
+        <div id="dashboard-section" class="hidden space-y-6">
+            
+            <!-- Tab Navigation -->
+            <div class="flex flex-wrap gap-2 border-b border-slate-700 pb-2">
+                <button onclick="switchTab('matches')" id="btn-tab-matches" class="px-4 py-2 rounded-lg font-semibold text-sm bg-emerald-600 text-white transition">Jadwal Pertandingan</button>
+                <button onclick="switchTab('standings')" id="btn-tab-standings" class="px-4 py-2 rounded-lg font-semibold text-sm bg-slate-800 text-slate-400 hover:bg-slate-700 transition">Klasemen Grup</button>
+                <button onclick="switchTab('knockout')" id="btn-tab-knockout" class="px-4 py-2 rounded-lg font-semibold text-sm bg-slate-800 text-slate-400 hover:bg-slate-700 transition">Bagan Knockout (Semifinal/Final)</button>
+                <button onclick="resetTournament()" class="ml-auto px-4 py-2 rounded-lg font-semibold text-sm bg-rose-900/40 text-rose-300 hover:bg-rose-900/60 transition">Reset Turnamen</button>
+            </div>
+
+            <!-- TAB 1: JADWAL PERTANDINGAN GRUP -->
+            <div id="tab-matches" class="space-y-4">
+                <h2 class="text-lg font-semibold text-emerald-300">Jadwal Babak Penyisihan Grup (Round Robin)</h2>
+                <div id="matches-container" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            </div>
+
+            <!-- TAB 2: KLASEMEN GRUP -->
+            <div id="tab-standings" class="hidden space-y-6">
+                <h2 class="text-lg font-semibold text-emerald-300">Klasemen Berdasarkan Grup</h2>
+                <div id="standings-container" class="space-y-6"></div>
+            </div>
+
+            <!-- TAB 3: BAGAN KNOCKOUT -->
+            <div id="tab-knockout" class="hidden space-y-4">
+                <h2 class="text-lg font-semibold text-emerald-300">Bagan Fase Gugur (Semifinal & Final)</h2>
+                <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
+                    <p class="text-sm text-slate-400 mb-4">Pemenang atau Runner-up dari tiap grup otomatis melaju ke tahap ini setelah semua laga grup selesai.</p>
+                    <div id="knockout-container" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- MODAL PENCATATAN SKOR -->
+        <div id="scoreboard-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+            <div class="bg-slate-800 w-full max-w-2xl rounded-2xl border border-slate-700 p-6 shadow-2xl relative">
+                <button onclick="closeScoreboard()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-xl font-bold">✕</button>
+                
+                <div class="text-center mb-6">
+                    <span id="modal-match-title" class="text-xs uppercase tracking-wider bg-emerald-900/50 text-emerald-300 px-3 py-1 rounded-full font-semibold">Match</span>
+                    <h3 id="modal-match-teams" class="text-xl font-bold mt-2">Tim A vs Tim B</h3>
+                </div>
+
+                <!-- Papan Skor Utama -->
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 text-center">
+                        <div id="team1-name" class="font-bold text-slate-200 truncate mb-2">Tim A</div>
+                        <div class="text-3xl font-extrabold text-emerald-400 mb-1" id="team1-sets">0</div>
+                        <div class="text-xs text-slate-400 mb-2">Set Menang</div>
+                        <div class="bg-slate-800 py-1.5 rounded-lg border border-slate-700 mb-2">
+                            <span class="text-xs text-slate-400">Game: <strong id="team1-games" class="text-white text-lg">0</strong></span>
+                        </div>
+                        <div class="bg-emerald-950/60 border border-emerald-800 py-2 rounded-lg">
+                            <span class="text-xs text-emerald-400 block">Poin:</span>
+                            <span id="team1-points" class="text-2xl font-black text-emerald-300">0</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 text-center">
+                        <div id="team2-name" class="font-bold text-slate-200 truncate mb-2">Tim B</div>
+                        <div class="text-3xl font-extrabold text-emerald-400 mb-1" id="team2-sets">0</div>
+                        <div class="text-xs text-slate-400 mb-2">Set Menang</div>
+                        <div class="bg-slate-800 py-1.5 rounded-lg border border-slate-700 mb-2">
+                            <span class="text-xs text-slate-400">Game: <strong id="team2-games" class="text-white text-lg">0</strong></span>
+                        </div>
+                        <div class="bg-emerald-950/60 border border-emerald-800 py-2 rounded-lg">
+                            <span class="text-xs text-emerald-400 block">Poin:</span>
+                            <span id="team2-points" class="text-2xl font-black text-emerald-300">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tombol Input Poin -->
+                <div class="space-y-3">
+                    <div class="text-xs text-slate-400 text-center">Klik tombol poin untuk tim yang mencetak angka (15, 30, 40, Game):</div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <button onclick="addPoint(0)" class="bg-emerald-600 hover:bg-emerald-500 py-3 rounded-xl font-bold text-white shadow-lg transition">
+                            + Poin <span id="btn-name-1">Tim A</span>
+                        </button>
+                        <button onclick="addPoint(1)" class="bg-emerald-600 hover:bg-emerald-500 py-3 rounded-xl font-bold text-white shadow-lg transition">
+                            + Poin <span id="btn-name-2">Tim B</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="match-status-alert" class="mt-4 p-3 bg-slate-900 rounded-xl text-center text-sm font-medium text-amber-300 hidden">
+                    Pertandingan Selesai! Pemenang: <span id="winner-text" class="font-bold"></span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- JavaScript Integrasi Supabase & Logika Turnamen -->
+    <script>
+        // ==========================================
+        // KONFIGURASI SUPABASE (MASUKKAN KUNCI KAMU)
+        // ==========================================
+        const SUPABASE_URL = 'https://ojbotngeglnwkcffyzvv.supabase.co/rest/v1/';
+        const SUPABASE_ANON_KEY = 'KU2iYySYdcdcEhDPrprUYw_9uVbx1M4';
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let players = [];
+        let pools = {}; 
+        let matches = []; 
+        let knockoutMatches = []; 
+        let config = { sets: 3, gamesPerSet: 6, scoringSystem: 'game-diff' };
+        let activeMatchContext = { type: 'group', index: null };
+        let sortableInstances = [];
+        
+        const pointSequence = ['0', '15', '30', '40', 'AD'];
+
+        window.onload = function() {
+            generateTeamChips();
+            toggleAssignmentUI();
+            fetchDataFromCloud();
+            setupRealtimeSubscription();
+        };
+
+        // --- FUNGSI CLOUD SUPABASE ---
+        async function fetchDataFromCloud() {
+            try {
+                let { data: matchesData } = await _supabase.from('matches').select('*');
+                let { data: koData } = await _supabase.from('knockout_matches').select('*');
+                
+                if (matchesData && matchesData.length > 0) {
+                    matches = matchesData;
+                    // Rekonstruksi pools dari data matches
+                    pools = {};
+                    matches.forEach(m => {
+                        if (!pools[m.pool]) pools[m.pool] = [];
+                        if (!pools[m.pool].includes(m.p1)) pools[m.pool].push(m.p1);
+                        if (!pools[m.pool].includes(m.p2)) pools[m.pool].push(m.p2);
+                    });
+
+                    if (koData && koData.length > 0) knockoutMatches = koData;
+
+                    document.getElementById('setup-section').classList.add('hidden');
+                    document.getElementById('dashboard-section').classList.remove('hidden');
+                    renderMatches();
+                    renderStandings();
+                    renderKnockout();
+                }
+            } catch (err) {
+                console.log("Belum ada data di cloud atau offline:", err);
+            }
+        }
+
+        function setupRealtimeSubscription() {
+            _supabase
+                .channel('public:matches')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, payload => {
+                    fetchDataFromCloud();
+                })
+                .subscribe();
+
+            _supabase
+                .channel('public:knockout_matches')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'knockout_matches' }, payload => {
+                    fetchDataFromCloud();
+                })
+                .subscribe();
+        }
+
+        async function saveMatchToCloud(matchItem, isGroup = true) {
+            const tableName = isGroup ? 'matches' : 'knockout_matches';
+            if (matchItem.id) {
+                await _supabase.from(tableName).update(matchItem).eq('id', matchItem.id);
+            }
+        }
+
+        // --- INTERAKSI LOKAL & DRAG DROP ---
+        function generateTeamChips() {
+            const rawText = document.getElementById('input-players').value;
+            players = rawText.split('\n').map(p => p.trim()).filter(p => p.length > 0);
+            
+            const container = document.getElementById('unsorted-chips');
+            container.innerHTML = '';
+            
+            players.forEach(p => {
+                container.innerHTML += `<div class="team-chip bg-slate-700 hover:bg-slate-600 text-slate-100 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-grab shadow-sm border border-slate-600">${p}</div>`;
+            });
+
+            renderManualPoolBoxes();
+        }
+
+        function renderManualPoolBoxes() {
+            const numPools = parseInt(document.getElementById('input-pools').value);
+            const container = document.getElementById('manual-pools-container');
+            container.innerHTML = '';
+
+            for (let i = 0; i < numPools; i++) {
+                const poolName = `Pool ${String.fromCharCode(65 + i)}`;
+                container.innerHTML += `
+                    <div class="bg-slate-800 p-3 rounded-xl border border-slate-700">
+                        <span class="text-xs font-bold text-emerald-400 block mb-2 uppercase tracking-wider">${poolName}</span>
+                        <div id="pool-box-${i}" class="pool-dropzone flex flex-wrap gap-2 min-h-[90px] p-2 bg-slate-900 rounded-lg border border-dashed border-slate-700" data-pool="${poolName}"></div>
+                    </div>
+                `;
+            }
+            initSortable();
+        }
+
+        function initSortable() {
+            sortableInstances.forEach(s => s.destroy());
+            sortableInstances = [];
+
+            const unsortedEl = document.getElementById('unsorted-chips');
+            if (unsortedEl) {
+                sortableInstances.push(new Sortable(unsortedEl, { group: 'shared', animation: 150 }));
+            }
+
+            const poolBoxes = document.querySelectorAll('.pool-dropzone');
+            poolBoxes.forEach(box => {
+                sortableInstances.push(new Sortable(box, { group: 'shared', animation: 150 }));
+            });
+        }
+
+        function toggleAssignmentUI() {
+            const method = document.getElementById('input-assignment-method').value;
+            const manualSec = document.getElementById('manual-pool-section');
+            if (method === 'manual') {
+                manualSec.classList.remove('hidden');
+                generateTeamChips();
+            } else {
+                manualSec.classList.add('hidden');
+            }
+        }
+
+        async function initTournament() {
+            const method = document.getElementById('input-assignment-method').value;
+            const numPools = parseInt(document.getElementById('input-pools').value);
+
+            config.sets = parseInt(document.getElementById('input-sets').value);
+            config.gamesPerSet = parseInt(document.getElementById('input-games').value);
+            config.scoringSystem = document.getElementById('input-scoring-system').value;
+
+            pools = {};
+            for (let i = 0; i < numPools; i++) {
+                pools[`Pool ${String.fromCharCode(65 + i)}`] = [];
+            }
+
+            if (method === 'manual') {
+                let totalAssigned = 0;
+                for (let i = 0; i < numPools; i++) {
+                    const poolName = `Pool ${String.fromCharCode(65 + i)}`;
+                    const box = document.getElementById(`pool-box-${i}`);
+                    const chips = box.querySelectorAll('.team-chip');
+                    chips.forEach(chip => {
+                        pools[poolName].push(chip.innerText.trim());
+                        totalAssigned++;
+                    });
+                }
+                if (totalAssigned < 2) {
+                    alert('Harap seret minimal 2 tim ke dalam kotak pool!');
+                    return;
+                }
+            } else {
+                const rawText = document.getElementById('input-players').value;
+                players = rawText.split('\n').map(p => p.trim()).filter(p => p.length > 0);
+                if (players.length < 2) {
+                    alert('Masukkan minimal 2 pemain/tim!');
+                    return;
+                }
+                for (let i = players.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [players[i], players[j]] = [players[j], players[i]];
+                }
+                players.forEach((p, idx) => {
+                    const poolKey = `Pool ${String.fromCharCode(65 + (idx % numPools))}`;
+                    pools[poolKey].push(p);
+                });
+            }
+
+            // Kosongkan tabel lama di Supabase sebelum isi baru
+            await _supabase.from('matches').delete().neq('id', 0);
+            await _supabase.from('knockout_matches').delete().neq('id', 0);
+
+            // Generate Group Matches
+            matches = [];
+            for (const poolName of Object.keys(pools)) {
+                const poolPlayers = pools[poolName];
+                for (let i = 0; i < poolPlayers.length; i++) {
+                    for (let j = i + 1; j < poolPlayers.length; j++) {
+                        let newMatch = {
+                            pool: poolName,
+                            p1: poolPlayers[i],
+                            p2: poolPlayers[j],
+                            p1_sets: 0, p2_sets: 0,
+                            p1_games: 0, p2_games: 0,
+                            total_p1_games_won: 0, total_p1_games_lost: 0,
+                            total_p2_games_won: 0, total_p2_games_lost: 0,
+                            p1_point_index: 0, p2_point_index: 0,
+                            is_finished: false, winner: null
+                        };
+                        let { data } = await _supabase.from('matches').insert([newMatch]).select();
+                        if (data) matches.push(data[0]);
+                    }
+                }
+            }
+
+            // Generate Knockout placeholder
+            knockoutMatches = [];
+            let koTemplates = [
+                { title: 'Semifinal 1', p1: 'Juara Pool A', p2: 'Runner-up Pool B' },
+                { title: 'Semifinal 2', p1: 'Juara Pool B', p2: 'Runner-up Pool A' },
+                { title: 'Final', p1: 'Pemenang SF 1', p2: 'Pemenang SF 2' }
+            ];
+            for (const kt of koTemplates) {
+                let koObj = {
+                    title: kt.title, p1: kt.p1, p2: kt.p2,
+                    p1_sets: 0, p2_sets: 0, p1_games: 0, p2_games: 0,
+                    is_finished: false, winner: null
+                };
+                let { data } = await _supabase.from('knockout_matches').insert([koObj]).select();
+                if (data) knockoutMatches.push(data[0]);
+            }
+
+            document.getElementById('setup-section').classList.add('hidden');
+            document.getElementById('dashboard-section').classList.remove('hidden');
+            
+            renderMatches();
+            renderStandings();
+            renderKnockout();
+        }
+
+        function switchTab(tab) {
+            ['matches', 'standings', 'knockout'].forEach(t => {
+                document.getElementById(`tab-${t}`).classList.add('hidden');
+                document.getElementById(`btn-tab-${t}`).className = "px-4 py-2 rounded-lg font-semibold text-sm bg-slate-800 text-slate-400 hover:bg-slate-700 transition";
+            });
+            document.getElementById(`tab-${tab}`).classList.remove('hidden');
+            document.getElementById(`btn-tab-${tab}`).className = "px-4 py-2 rounded-lg font-semibold text-sm bg-emerald-600 text-white transition";
+            
+            if (tab === 'standings') renderStandings();
+            if (tab === 'knockout') updateKnockoutSeeds();
+        }
+
+        function renderMatches() {
+            const container = document.getElementById('matches-container');
+            container.innerHTML = '';
+
+            matches.forEach((m, idx) => {
+                const statusBadge = m.is_finished 
+                    ? `<span class="bg-emerald-900/60 text-emerald-300 px-2 py-0.5 rounded text-xs">Selesai: ${m.winner}</span>`
+                    : `<span class="bg-amber-900/60 text-amber-300 px-2 py-0.5 rounded text-xs">${m.pool}</span>`;
+
+                container.innerHTML += `
+                    <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 flex flex-col justify-between shadow-md">
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs text-slate-400 font-semibold">Match #${idx + 1}</span>
+                                ${statusBadge}
+                            </div>
+                            <div class="text-base font-bold text-slate-100 mb-3">
+                                ${m.p1} <span class="text-emerald-400 font-normal">vs</span> ${m.p2}
+                            </div>
+                            <div class="text-sm bg-slate-900 p-2 rounded-lg mb-4 flex justify-between text-slate-300">
+                                <span>Set: <b>${m.p1_sets} - ${m.p2_sets}</b></span>
+                                <span>Game Berjalan: ${m.p1_games} - ${m.p2_games}</span>
+                            </div>
+                        </div>
+                        <button onclick="openScoreboard('group', ${idx})" class="w-full bg-slate-700 hover:bg-emerald-600 text-white text-sm font-semibold py-2 rounded-lg transition">
+                            ${m.is_finished ? 'Ubah Skor' : 'Catat Skor ➔'}
+                        </button>
+                    </div>
+                `;
+            });
+        }
+
+        function openScoreboard(type, index) {
+            activeMatchContext = { type, index };
+            const m = type === 'group' ? matches[index] : knockoutMatches[index];
+
+            if(m.p1_point_index === undefined) m.p1_point_index = 0;
+            if(m.p2_point_index === undefined) m.p2_point_index = 0;
+
+            document.getElementById('modal-match-title').innerText = type === 'group' ? `Match Grup #${index + 1}` : m.title;
+            document.getElementById('modal-match-teams').innerText = `${m.p1} vs ${m.p2}`;
+            document.getElementById('team1-name').innerText = m.p1;
+            document.getElementById('team2-name').innerText = m.p2;
+            document.getElementById('btn-name-1').innerText = m.p1;
+            document.getElementById('btn-name-2').innerText = m.p2;
+
+            updateScoreboardUI();
+            document.getElementById('scoreboard-modal').classList.remove('hidden');
+            document.getElementById('scoreboard-modal').classList.add('flex');
+        }
+
+        function closeScoreboard() {
+            document.getElementById('scoreboard-modal').classList.remove('flex');
+            document.getElementById('scoreboard-modal').classList.add('hidden');
+            renderMatches();
+            renderStandings();
+            updateKnockoutSeeds();
+        }
+
+        function updateScoreboardUI() {
+            const m = activeMatchContext.type === 'group' ? matches[activeMatchContext.index] : knockoutMatches[activeMatchContext.index];
+            document.getElementById('team1-sets').innerText = m.p1_sets;
+            document.getElementById('team2-sets').innerText = m.p2_sets;
+            document.getElementById('team1-games').innerText = m.p1_games;
+            document.getElementById('team2-games').innerText = m.p2_games;
+            
+            document.getElementById('team1-points').innerText = pointSequence[m.p1_point_index || 0];
+            document.getElementById('team2-points').innerText = pointSequence[m.p2_point_index || 0];
+
+            const alertBox = document.getElementById('match-status-alert');
+            if (m.is_finished) {
+                alertBox.classList.remove('hidden');
+                document.getElementById('winner-text').innerText = m.winner;
+            } else {
+                alertBox.classList.add('hidden');
+            }
+        }
+
+        async function addPoint(playerTeam) {
+            let m = activeMatchContext.type === 'group' ? matches[activeMatchContext.index] : knockoutMatches[activeMatchContext.index];
+            if (m.is_finished) return;
+
+            if (playerTeam === 0) m.p1_point_index = (m.p1_point_index || 0) + 1;
+            else m.p2_point_index = (m.p2_point_index || 0) + 1;
+            
+            checkGameWon(m);
+            updateScoreboardUI();
+            await saveMatchToCloud(m, activeMatchContext.type === 'group');
+        }
+
+        function checkGameWon(m) {
+            let p1Idx = m.p1_point_index || 0;
+            let p2Idx = m.p2_point_index || 0;
+
+            let p1WonGame = false;
+            let p2WonGame = false;
+
+            if (p1Idx >= 3 && p2Idx >= 3) {
+                if (p1Idx - p2Idx >= 2) p1WonGame = true;
+                else if (p2Idx - p1Idx >= 2) p2WonGame = true;
+                else if (p1Idx - p2Idx === 1) { m.p1_point_index = 4; m.p2_point_index = 3; }
+                else if (p2Idx - p1Idx === 1) { m.p2_point_index = 4; m.p1_point_index = 3; }
+                else if (p1Idx === p2Idx) { m.p1_point_index = 3; m.p2_point_index = 3; }
+            } else {
+                if (p1Idx > 3) p1WonGame = true;
+                if (p2Idx > 3) p2WonGame = true;
+            }
+
+            if (p1WonGame || p2WonGame) {
+                let wonBy = p1WonGame ? 1 : 2;
+                if (wonBy === 1) {
+                    m.p1_games++;
+                    m.total_p1_games_won = (m.total_p1_games_won || 0) + 1;
+                    m.total_p2_games_lost = (m.total_p2_games_lost || 0) + 1;
+                } else {
+                    m.p2_games++;
+                    m.total_p2_games_won = (m.total_p2_games_won || 0) + 1;
+                    m.total_p1_games_lost = (m.total_p1_games_lost || 0) + 1;
+                }
+                m.p1_point_index = 0;
+                m.p2_point_index = 0;
+                checkSetWon(m);
+            }
+        }
+
+        function checkSetWon(m) {
+            let targetGames = config.gamesPerSet;
+            let p1G = m.p1_games;
+            let p2G = m.p2_games;
+
+            let setWon = false;
+            let setWinner = null;
+
+            if ((p1G >= targetGames && p1G - p2G >= 2) || p1G === targetGames + 1) {
+                setWon = true; setWinner = 1;
+            } else if ((p2G >= targetGames && p2G - p1G >= 2) || p2G === targetGames + 1) {
+                setWon = true; setWinner = 2;
+            }
+
+            if (setWon) {
+                if (setWinner === 1) m.p1_sets++;
+                else m.p2_sets++;
+
+                m.p1_games = 0;
+                m.p2_games = 0;
+
+                let setsNeeded = Math.ceil(config.sets / 2);
+                if (m.p1_sets === setsNeeded) {
+                    m.is_finished = true; m.winner = m.p1;
+                } else if (m.p2_sets === setsNeeded) {
+                    m.is_finished = true; m.winner = m.p2;
+                }
+            }
+        }
+
+        function renderStandings() {
+            const container = document.getElementById('standings-container');
+            container.innerHTML = '';
+
+            Object.keys(pools).forEach(poolName => {
+                let poolPlayers = pools[poolName];
+                let stats = {};
+                poolPlayers.forEach(p => {
+                    stats[p] = { played: 0, won: 0, lost: 0, gamesWon: 0, gamesLost: 0, points: 0 };
+                });
+
+                matches.filter(m => m.pool === poolName && m.is_finished).forEach(m => {
+                    stats[m.p1].played++;
+                    stats[m.p2].played++;
+
+                    stats[m.p1].gamesWon += (m.total_p1_games_won || 0);
+                    stats[m.p1].gamesLost += (m.total_p1_games_lost || 0);
+                    stats[m.p2].gamesWon += (m.total_p2_games_won || 0);
+                    stats[m.p2].gamesLost += (m.total_p2_games_lost || 0);
+
+                    if (m.winner === m.p1) {
+                        stats[m.p1].won++; stats[m.p1].points += 2;
+                        stats[m.p2].lost++;
+                    } else {
+                        stats[m.p2].won++; stats[m.p2].points += 2;
+                        stats[m.p1].lost++;
+                    }
+                });
+
+                let sorted = [...poolPlayers].sort((a, b) => {
+                    let sA = stats[a], sB = stats[b];
+                    if (config.scoringSystem === 'match-wins') {
+                        if (sB.points !== sA.points) return sB.points - sA.points;
+                    }
+                    let diffA = sA.gamesWon - sA.gamesLost;
+                    let diffB = sB.gamesWon - sB.gamesLost;
+                    if (diffB !== diffA) return diffB - diffA;
+                    return sB.gamesWon - sA.gamesWon;
+                });
+
+                let rowsHtml = '';
+                sorted.forEach((p, idx) => {
+                    let st = stats[p];
+                    let diff = st.gamesWon - st.gamesLost;
+                    rowsHtml += `
+                        <tr class="border-b border-slate-700/60 hover:bg-slate-700/30 text-sm">
+                            <td class="p-3 text-center font-bold text-emerald-400">${idx + 1}</td>
+                            <td class="p-3 font-semibold text-slate-100">${p}</td>
+                            <td class="p-3 text-center">${st.played}</td>
+                            <td class="p-3 text-center text-emerald-400 font-semibold">${st.won}</td>
+                            <td class="p-3 text-center text-rose-400">${st.lost}</td>
+                            <td class="p-3 text-center text-emerald-300 font-bold">${st.gamesWon}</td>
+                            <td class="p-3 text-center text-rose-300">${st.gamesLost}</td>
+                            <td class="p-3 text-center font-bold ${diff >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${diff >= 0 ? '+' + diff : diff}</td>
+                            ${config.scoringSystem === 'match-wins' ? `<td class="p-3 text-center font-black text-amber-300">${st.points}</td>` : ''}
+                        </tr>
+                    `;
+                });
+
+                container.innerHTML += `
+                    <div class="bg-slate-800 rounded-2xl border border-slate-700 p-5 shadow-xl">
+                        <h3 class="font-bold text-emerald-400 mb-3 text-base">${poolName}</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-700/50 text-slate-300 border-b border-slate-700 text-xs uppercase">
+                                        <th class="p-3 text-center w-10">Pos</th>
+                                        <th class="p-3">Tim</th>
+                                        <th class="p-3 text-center">Main</th>
+                                        <th class="p-3 text-center">M</th>
+                                        <th class="p-3 text-center">K</th>
+                                        <th class="p-3 text-center">GM</th>
+                                        <th class="p-3 text-center">GK</th>
+                                        <th class="p-3 text-center">Selisih Game</th>
+                                        ${config.scoringSystem === 'match-wins' ? '<th class="p-3 text-center">Poin</th>' : ''}
+                                    </tr>
+                                </thead>
+                                <tbody>${rowsHtml}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function getPoolStandings(poolName) {
+            let poolPlayers = pools[poolName] || [];
+            let stats = {};
+            poolPlayers.forEach(p => { stats[p] = { gamesWon: 0, gamesLost: 0, points: 0, won: 0 }; });
+
+            matches.filter(m => m.pool === poolName && m.is_finished).forEach(m => {
+                stats[m.p1].gamesWon += (m.total_p1_games_won || 0);
+                stats[m.p1].gamesLost += (m.total_p1_games_lost || 0);
+                stats[m.p2].gamesWon += (m.total_p2_games_won || 0);
+                stats[m.p2].gamesLost += (m.total_p2_games_lost || 0);
+                if (m.winner === m.p1) { stats[m.p1].won++; stats[m.p1].points += 2; }
+                else { stats[m.p2].won++; stats[m.p2].points += 2; }
+            });
+
+            return [...poolPlayers].sort((a, b) => {
+                let diffA = stats[a].gamesWon - stats[a].gamesLost;
+                let diffB = stats[b].gamesWon - stats[b].gamesLost;
+                if (diffB !== diffA) return diffB - diffA;
+                return stats[b].gamesWon - stats[a].gamesWon;
+            });
+        }
+
+        function updateKnockoutSeeds() {
+            const poolNames = Object.keys(pools);
+            if (poolNames.length >= 2) {
+                let poolAStandings = getPoolStandings(poolNames[0]);
+                let poolBStandings = getPoolStandings(poolNames[1]);
+
+                knockoutMatches[0].p1 = poolAStandings[0] || 'Juara Pool A';
+                knockoutMatches[0].p2 = poolBStandings[1] || 'Runner-up Pool B';
+
+                knockoutMatches[1].p1 = poolBStandings[0] || 'Juara Pool B';
+                knockoutMatches[1].p2 = poolAStandings[1] || 'Runner-up Pool A';
+
+                knockoutMatches[2].p1 = knockoutMatches[0].winner || 'Pemenang SF 1';
+                knockoutMatches[2].p2 = knockoutMatches[1].winner || 'Pemenang SF 2';
+            }
+            renderKnockout();
+        }
+
+        function renderKnockout() {
+            const container = document.getElementById('knockout-container');
+            container.innerHTML = '';
+
+            knockoutMatches.forEach((km, idx) => {
+                container.innerHTML += `
+                    <div class="bg-slate-900 border border-slate-700 rounded-xl p-4 flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs text-emerald-400 font-bold uppercase tracking-wider">${km.title}</span>
+                                <span class="text-xs ${km.is_finished ? 'bg-emerald-900 text-emerald-300' : 'bg-slate-800 text-slate-400'} px-2 py-0.5 rounded">
+                                    ${km.is_finished ? 'Pemenang: ' + km.winner : 'Belum Mulai'}
+                                </span>
+                            </div>
+                            <div class="text-sm font-bold text-slate-100 mb-3">${km.p1} vs ${km.p2}</div>
+                        </div>
+                        <button onclick="openScoreboard('knockout', ${idx})" class="w-full bg-slate-800 hover:bg-emerald-600 text-white text-xs font-semibold py-2 rounded-lg transition">
+                            Catat / Edit Skor Knockout ➔
+                        </button>
+                    </div>
+                `;
+            });
+        }
+
+        async function resetTournament() {
+            if (confirm('Yakin ingin mereset seluruh turnamen?')) {
+                await _supabase.from('matches').delete().neq('id', 0);
+                await _supabase.from('knockout_matches').delete().neq('id', 0);
+                document.getElementById('dashboard-section').classList.add('hidden');
+                document.getElementById('setup-section').classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
